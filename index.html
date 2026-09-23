@@ -276,7 +276,7 @@
 
 <div class="page">
   <header class="top">
-    <button type="button" class="theme-toggle" id="themeToggle" title="Cambiar tema" aria-label="Cambiar tema">🌙</button>
+    <button type="button" class="theme-toggle" id="themeToggle" title="Cambiar tema" aria-label="Cambiar tema">☀️</button>
     <div class="eyebrow">DexLab-3d</div>
     <h1>Sensor DHT-Dex1</h1>
     <div class="status-row">
@@ -766,7 +766,7 @@ Temperatura y humedad son la lectura real de dos sensores <b>DHT21</b> conectado
 
   function applyThemeIcon(theme){
     var isDark = theme === 'dark' || (!theme && prefersDarkMq && prefersDarkMq.matches);
-    themeToggle.textContent = isDark ? '☀️' : '🌙';
+    themeToggle.textContent = isDark ? '🌙' : '☀️';
   }
   function loadTheme(){
     try { return localStorage.getItem('sensorBenchTheme'); } catch(e){ return null; }
