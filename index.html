@@ -20,6 +20,10 @@
     --accent-temp-soft:rgba(224,90,14,0.13);
     --accent-hum:#0E7C86;
     --accent-hum-soft:rgba(14,124,134,0.13);
+    --accent-temp2:#7C3AED;
+    --accent-temp2-soft:rgba(124,58,237,0.13);
+    --accent-hum2:#C0287A;
+    --accent-hum2-soft:rgba(192,40,122,0.13);
     --good:#1E8E5A;
     --good-soft:rgba(30,142,90,0.14);
     --warn:#B4790F;
@@ -42,6 +46,10 @@
       --accent-temp-soft:rgba(242,115,42,0.18);
       --accent-hum:#2BB3BE;
       --accent-hum-soft:rgba(43,179,190,0.18);
+      --accent-temp2:#A78BFA;
+      --accent-temp2-soft:rgba(167,139,250,0.18);
+      --accent-hum2:#F472B6;
+      --accent-hum2-soft:rgba(244,114,182,0.18);
       --good:#3FC085;
       --good-soft:rgba(63,192,133,0.18);
       --warn:#E0A730;
@@ -63,6 +71,10 @@
     --accent-temp-soft:rgba(242,115,42,0.18);
     --accent-hum:#2BB3BE;
     --accent-hum-soft:rgba(43,179,190,0.18);
+    --accent-temp2:#A78BFA;
+    --accent-temp2-soft:rgba(167,139,250,0.18);
+    --accent-hum2:#F472B6;
+    --accent-hum2-soft:rgba(244,114,182,0.18);
     --good:#3FC085;
     --good-soft:rgba(63,192,133,0.18);
     --warn:#E0A730;
@@ -86,14 +98,23 @@
 
   .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;}
 
-  header.top{display:flex;flex-direction:column;gap:12px;}
+  header.top{position:relative;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;}
   .eyebrow{
     font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
     color:var(--ink-3);
   }
   h1{font-size:26px;font-weight:700;letter-spacing:-0.01em;margin:2px 0 0;text-wrap:balance;}
 
+  .theme-toggle{
+    position:absolute;top:0;right:0;width:36px;height:36px;flex:none;
+    display:flex;align-items:center;justify-content:center;font-size:17px;line-height:1;
+    background:var(--surface);border:1px solid var(--border);border-radius:10px;
+    box-shadow:var(--shadow);cursor:pointer;color:var(--ink);
+  }
+  .theme-toggle:hover{filter:brightness(1.05);}
+
   .status-row{
+    align-self:stretch;text-align:left;
     display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;
     padding:12px 14px;background:var(--surface);border:1px solid var(--border);
     border-radius:12px;box-shadow:var(--shadow);
@@ -140,8 +161,24 @@
   .stat-card.hum .spark-area{fill:var(--accent-hum-soft);}
   .stat-card.hum .spark-line{stroke:var(--accent-hum);}
   .stat-card.hum .spark-dot{fill:var(--accent-hum);}
+  .stat-card.temp2 .stat-label{color:var(--accent-temp2);}
+  .stat-card.temp2 .spark-area{fill:var(--accent-temp2-soft);}
+  .stat-card.temp2 .spark-line{stroke:var(--accent-temp2);}
+  .stat-card.temp2 .spark-dot{fill:var(--accent-temp2);}
+  .stat-card.hum2 .stat-label{color:var(--accent-hum2);}
+  .stat-card.hum2 .spark-area{fill:var(--accent-hum2-soft);}
+  .stat-card.hum2 .spark-line{stroke:var(--accent-hum2);}
+  .stat-card.hum2 .spark-dot{fill:var(--accent-hum2);}
   .spark-line{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
   .spark-empty{font-size:12px;color:var(--ink-3);font-style:italic;padding-block:16px 4px;}
+
+  .sensor-group{display:flex;flex-direction:column;gap:14px;}
+  .sensor-group-label{
+    display:flex;align-items:center;gap:10px;font-size:12px;font-weight:700;
+    letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);
+  }
+  .sensor-group-label .line{flex:1;height:1px;background:var(--border);}
+  .sensor-group-label.g2{color:var(--accent-temp2);}
 
   .chart-card{
     background:var(--surface);border:1px solid var(--border);border-radius:14px;
@@ -162,6 +199,14 @@
   .chart-card.hum .area-fill{fill:var(--accent-hum-soft);}
   .chart-card.hum .line-path{stroke:var(--accent-hum);}
   .chart-card.hum .hover-dot,.chart-card.hum .end-dot{fill:var(--accent-hum);}
+  .chart-card.temp2 h3{color:var(--accent-temp2);}
+  .chart-card.temp2 .area-fill{fill:var(--accent-temp2-soft);}
+  .chart-card.temp2 .line-path{stroke:var(--accent-temp2);}
+  .chart-card.temp2 .hover-dot,.chart-card.temp2 .end-dot{fill:var(--accent-temp2);}
+  .chart-card.hum2 h3{color:var(--accent-hum2);}
+  .chart-card.hum2 .area-fill{fill:var(--accent-hum2-soft);}
+  .chart-card.hum2 .line-path{stroke:var(--accent-hum2);}
+  .chart-card.hum2 .hover-dot,.chart-card.hum2 .end-dot{fill:var(--accent-hum2);}
   .line-path{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
   .crosshair{stroke:var(--ink-3);stroke-width:1;stroke-dasharray:3 3;opacity:0;}
   .hover-dot{opacity:0;}
@@ -231,16 +276,13 @@
 
 <div class="page">
   <header class="top">
+    <button type="button" class="theme-toggle" id="themeToggle" title="Cambiar tema" aria-label="Cambiar tema">🌙</button>
     <div class="eyebrow">DexLab-3d</div>
     <h1>Sensor DHT-Dex1</h1>
     <div class="status-row">
       <span class="pill state-connecting" id="statusPill"><span class="dot"></span><span id="statusText">Conectando&hellip;</span></span>
       <span class="pill mono" id="pktCounter" style="background:var(--surface-2);color:var(--ink-2);">pkts enviados 0 / recibidos 0</span>
       <div class="status-meta">
-        <span>Broker <b class="mono">HiveMQ Cloud</b></span>
-        <span class="sep">&middot;</span>
-        <span>Topic <b class="mono">mosquito1/#</b></span>
-        <span class="sep">&middot;</span>
         <span id="lastSeen">Sin mensajes todav&iacute;a</span>
         <span class="sep">&middot;</span>
         <button type="button" class="link-btn" id="toggleAuthBtn" hidden>Cambiar credenciales</button>
@@ -268,34 +310,71 @@
     </form>
   </section>
 
-  <section class="stats">
-    <div class="stat-card temp">
-      <div class="stat-head">
-        <span class="stat-label">Temperatura</span>
-        <span class="stat-age" id="tempAge">&mdash;</span>
-      </div>
-      <div class="stat-value"><span class="num" id="tempValue">&mdash;</span><span class="unit">&deg;C</span></div>
-      <div class="stat-spark" id="tempSpark"></div>
-    </div>
-    <div class="stat-card hum">
-      <div class="stat-head">
-        <span class="stat-label">Humedad</span>
-        <span class="stat-age" id="humAge">&mdash;</span>
-      </div>
-      <div class="stat-value"><span class="num" id="humValue">&mdash;</span><span class="unit">%</span></div>
-      <div class="stat-spark" id="humSpark"></div>
-    </div>
-  </section>
+  <div class="sensor-group">
+    <div class="sensor-group-label"><span class="line"></span><span>Sensor 1 &middot; GPIO18</span><span class="line"></span></div>
 
-  <section class="chart-card temp">
-    <div class="chart-head"><h3>Historial de temperatura</h3><span class="chart-range" id="tempRange"></span></div>
-    <div class="chart-wrap" id="tempChartWrap"></div>
-  </section>
+    <section class="stats">
+      <div class="stat-card temp">
+        <div class="stat-head">
+          <span class="stat-label">Temperatura</span>
+          <span class="stat-age" id="tempAge">&mdash;</span>
+        </div>
+        <div class="stat-value"><span class="num" id="tempValue">&mdash;</span><span class="unit">&deg;C</span></div>
+        <div class="stat-spark" id="tempSpark"></div>
+      </div>
+      <div class="stat-card hum">
+        <div class="stat-head">
+          <span class="stat-label">Humedad</span>
+          <span class="stat-age" id="humAge">&mdash;</span>
+        </div>
+        <div class="stat-value"><span class="num" id="humValue">&mdash;</span><span class="unit">%</span></div>
+        <div class="stat-spark" id="humSpark"></div>
+      </div>
+    </section>
 
-  <section class="chart-card hum">
-    <div class="chart-head"><h3>Historial de humedad</h3><span class="chart-range" id="humRange"></span></div>
-    <div class="chart-wrap" id="humChartWrap"></div>
-  </section>
+    <section class="chart-card temp">
+      <div class="chart-head"><h3>Historial de temperatura</h3><span class="chart-range" id="tempRange"></span></div>
+      <div class="chart-wrap" id="tempChartWrap"></div>
+    </section>
+
+    <section class="chart-card hum">
+      <div class="chart-head"><h3>Historial de humedad</h3><span class="chart-range" id="humRange"></span></div>
+      <div class="chart-wrap" id="humChartWrap"></div>
+    </section>
+  </div>
+
+  <div class="sensor-group">
+    <div class="sensor-group-label g2"><span class="line"></span><span>Sensor 2 &middot; GPIO14</span><span class="line"></span></div>
+
+    <section class="stats">
+      <div class="stat-card temp2">
+        <div class="stat-head">
+          <span class="stat-label">Temperatura</span>
+          <span class="stat-age" id="temp2Age">&mdash;</span>
+        </div>
+        <div class="stat-value"><span class="num" id="temp2Value">&mdash;</span><span class="unit">&deg;C</span></div>
+        <div class="stat-spark" id="temp2Spark"></div>
+      </div>
+      <div class="stat-card hum2">
+        <div class="stat-head">
+          <span class="stat-label">Humedad</span>
+          <span class="stat-age" id="hum2Age">&mdash;</span>
+        </div>
+        <div class="stat-value"><span class="num" id="hum2Value">&mdash;</span><span class="unit">%</span></div>
+        <div class="stat-spark" id="hum2Spark"></div>
+      </div>
+    </section>
+
+    <section class="chart-card temp2">
+      <div class="chart-head"><h3>Historial de temperatura</h3><span class="chart-range" id="temp2Range"></span></div>
+      <div class="chart-wrap" id="temp2ChartWrap"></div>
+    </section>
+
+    <section class="chart-card hum2">
+      <div class="chart-head"><h3>Historial de humedad</h3><span class="chart-range" id="hum2Range"></span></div>
+      <div class="chart-wrap" id="hum2ChartWrap"></div>
+    </section>
+  </div>
 
   <section class="log-card">
     <div class="log-head">
@@ -308,7 +387,7 @@
   </section>
 
   <footer class="note">
-Temperatura y humedad son la lectura real de un sensor <b>DHT21</b> conectado al ESP32 (pin de datos en GPIO18, con pull-up). Este panel se conecta directo desde tu navegador por WebSocket seguro (TLS) a un broker HiveMQ Cloud propio &mdash; nadie m&aacute;s ve estos datos salvo que compartas el link de este panel.
+Temperatura y humedad son la lectura real de dos sensores <b>DHT21</b> conectados al ESP32 (Sensor 1 en GPIO18, Sensor 2 en GPIO14, ambos con pull-up). Este panel se conecta directo desde tu navegador por WebSocket seguro (TLS) a un broker HiveMQ Cloud propio &mdash; nadie m&aacute;s ve estos datos salvo que compartas el link de este panel.
   </footer>
 </div>
 
@@ -317,7 +396,7 @@ Temperatura y humedad son la lectura real de un sensor <b>DHT21</b> conectado al
   "use strict";
 
   var MAX_POINTS = 60;
-  var history = []; // {ts, temp, hum, device}
+  var history = []; // {ts, temp, hum, temp2, hum2, device}
   var lastMsgTs = null;
 
   window.addEventListener('error', function(e){
@@ -338,6 +417,16 @@ Temperatura y humedad son la lectura real de un sensor <b>DHT21</b> conectado al
     humChartWrap: document.getElementById('humChartWrap'),
     tempRange: document.getElementById('tempRange'),
     humRange: document.getElementById('humRange'),
+    temp2Value: document.getElementById('temp2Value'),
+    hum2Value: document.getElementById('hum2Value'),
+    temp2Age: document.getElementById('temp2Age'),
+    hum2Age: document.getElementById('hum2Age'),
+    temp2Spark: document.getElementById('temp2Spark'),
+    hum2Spark: document.getElementById('hum2Spark'),
+    temp2ChartWrap: document.getElementById('temp2ChartWrap'),
+    hum2ChartWrap: document.getElementById('hum2ChartWrap'),
+    temp2Range: document.getElementById('temp2Range'),
+    hum2Range: document.getElementById('hum2Range'),
     logList: document.getElementById('logList'),
     logCount: document.getElementById('logCount')
   };
@@ -482,14 +571,23 @@ Temperatura y humedad son la lectura real de un sensor <b>DHT21</b> conectado al
   function renderAll(){
     var temps = history.filter(function(h){ return h.temp != null; }).map(function(h){ return { v:h.temp, ts:h.ts }; });
     var hums  = history.filter(function(h){ return h.hum  != null; }).map(function(h){ return { v:h.hum,  ts:h.ts }; });
+    var temp2s = history.filter(function(h){ return h.temp2 != null; }).map(function(h){ return { v:h.temp2, ts:h.ts }; });
+    var hum2s  = history.filter(function(h){ return h.hum2  != null; }).map(function(h){ return { v:h.hum2,  ts:h.ts }; });
 
     renderSpark(els.tempSpark, temps.map(function(p){return p.v;}));
     renderSpark(els.humSpark,  hums.map(function(p){return p.v;}));
     renderChart(els.tempChartWrap, temps, '°C', els.tempRange);
     renderChart(els.humChartWrap,  hums,  '%', els.humRange);
 
+    renderSpark(els.temp2Spark, temp2s.map(function(p){return p.v;}));
+    renderSpark(els.hum2Spark,  hum2s.map(function(p){return p.v;}));
+    renderChart(els.temp2ChartWrap, temp2s, '°C', els.temp2Range);
+    renderChart(els.hum2ChartWrap,  hum2s,  '%', els.hum2Range);
+
     if (temps.length) els.tempValue.textContent = temps[temps.length-1].v.toFixed(1);
     if (hums.length)  els.humValue.textContent  = hums[hums.length-1].v.toFixed(1);
+    if (temp2s.length) els.temp2Value.textContent = temp2s[temp2s.length-1].v.toFixed(1);
+    if (hum2s.length)  els.hum2Value.textContent  = hum2s[hum2s.length-1].v.toFixed(1);
   }
 
   function tickAges(){
@@ -498,6 +596,8 @@ Temperatura y humedad son la lectura real de un sensor <b>DHT21</b> conectado al
     var txt = fmtAgo(age);
     els.tempAge.textContent = txt;
     els.humAge.textContent = txt;
+    els.temp2Age.textContent = txt;
+    els.hum2Age.textContent = txt;
     els.lastSeen.innerHTML = 'Último dato <b>' + txt + '</b>';
   }
   setInterval(tickAges, 1000);
@@ -514,16 +614,25 @@ Temperatura y humedad son la lectura real de un sensor <b>DHT21</b> conectado al
     row.className = 'log-row';
     var hasTemp = data && typeof data.temp_c === 'number';
     var hasHum  = data && typeof data.hum === 'number';
-    if (hasTemp || hasHum){
-      if (hasTemp || hasHum){
-        history.push({ ts: now, temp: hasTemp ? data.temp_c : null, hum: hasHum ? data.hum : null, device: device });
-        if (history.length > MAX_POINTS) history.shift();
-      }
+    var hasTemp2 = data && typeof data.temp_c_2 === 'number';
+    var hasHum2  = data && typeof data.hum_2 === 'number';
+    if (hasTemp || hasHum || hasTemp2 || hasHum2){
+      history.push({
+        ts: now,
+        temp: hasTemp ? data.temp_c : null,
+        hum: hasHum ? data.hum : null,
+        temp2: hasTemp2 ? data.temp_c_2 : null,
+        hum2: hasHum2 ? data.hum_2 : null,
+        device: device
+      });
+      if (history.length > MAX_POINTS) history.shift();
       lastMsgTs = now;
       row.innerHTML =
         '<span class="log-time">'+fmtClock(new Date(now))+'</span>' +
         '<span class="log-device">'+shortDevice(device)+'</span>' +
-        '<span class="log-payload">temp '+(hasTemp ? data.temp_c.toFixed(1)+'&deg;C' : '&mdash;')+' &middot; hum '+(hasHum ? data.hum.toFixed(1)+'%' : '&mdash;')+' &middot; up '+data.uptime_s+'s</span>';
+        '<span class="log-payload">S1: '+(hasTemp ? data.temp_c.toFixed(1)+'&deg;C' : '&mdash;')+' &middot; '+(hasHum ? data.hum.toFixed(1)+'%' : '&mdash;')+
+        ' &nbsp;|&nbsp; S2: '+(hasTemp2 ? data.temp_c_2.toFixed(1)+'&deg;C' : '&mdash;')+' &middot; '+(hasHum2 ? data.hum_2.toFixed(1)+'%' : '&mdash;')+
+        ' &middot; up '+data.uptime_s+'s</span>';
       renderAll();
       tickAges();
     } else {
@@ -650,6 +759,36 @@ Temperatura y humedad son la lectura real de un sensor <b>DHT21</b> conectado al
     showAuthCard();
     setStatus('connecting', 'Esperando credenciales…');
   }
+
+  // ---------- tema claro/oscuro ----------
+  var themeToggle = document.getElementById('themeToggle');
+  var prefersDarkMq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
+  function applyThemeIcon(theme){
+    var isDark = theme === 'dark' || (!theme && prefersDarkMq && prefersDarkMq.matches);
+    themeToggle.textContent = isDark ? '☀️' : '🌙';
+  }
+  function loadTheme(){
+    try { return localStorage.getItem('sensorBenchTheme'); } catch(e){ return null; }
+  }
+  function saveTheme(theme){
+    try {
+      if (theme) localStorage.setItem('sensorBenchTheme', theme);
+      else localStorage.removeItem('sensorBenchTheme');
+    } catch(e){}
+  }
+  function setTheme(theme){
+    if (theme === 'dark' || theme === 'light') document.documentElement.setAttribute('data-theme', theme);
+    else document.documentElement.removeAttribute('data-theme');
+    applyThemeIcon(theme);
+    saveTheme(theme);
+  }
+  themeToggle.addEventListener('click', function(){
+    var current = document.documentElement.getAttribute('data-theme');
+    var currentlyDark = current === 'dark' || (!current && prefersDarkMq && prefersDarkMq.matches);
+    setTheme(currentlyDark ? 'light' : 'dark');
+  });
+  setTheme(loadTheme());
 
   renderAll();
 })();
