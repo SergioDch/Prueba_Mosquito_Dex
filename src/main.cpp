@@ -8,6 +8,7 @@
 #include "mqtt_client.h"
 #include <DHT.h>
 #include "secrets.h"
+#include "ca_certs.h"
 
 // =====================================================================
 //  SENSOR DHT21 - pin de datos en GPIO18, con pull-up
@@ -24,9 +25,9 @@ float ultimaHum = NAN;
 size_t wifiIdx = 0;
 
 // =====================================================================
-//  BROKER MQTT (WebSocket)
+//  BROKER MQTT (WebSocket seguro - HiveMQ Cloud propio)
 // =====================================================================
-const char* MQTT_URI = "ws://mqqt.diformosa.com/mqtt";
+const char* MQTT_URI = "wss://5dab8a9752864256b9b112a6465de82a.s1.eu.hivemq.cloud:8884/mqtt";
 
 esp_mqtt_client_handle_t mqttClient = nullptr;
 bool mqttIniciado = false;
@@ -93,6 +94,7 @@ void iniciarMqtt() {
   cfg.client_id = mqttClientId;
   if (MQTT_USER) cfg.username = MQTT_USER;
   if (MQTT_PASS) cfg.password = MQTT_PASS;
+  cfg.cert_pem = ISRG_ROOT_X1;
 
   mqttClient = esp_mqtt_client_init(&cfg);
   esp_mqtt_client_register_event(mqttClient, MQTT_EVENT_ANY, mqttEventHandler, NULL);
@@ -142,7 +144,7 @@ void setup() {
 
   uint64_t mac = ESP.getEfuseMac();
   snprintf(mqttClientId, sizeof(mqttClientId), "esp32-%04X%08X", (uint16_t)(mac >> 32), (uint32_t)mac);
-  snprintf(mqttTopic, sizeof(mqttTopic), "dexlab3d/%04X%08X/sensores", (uint16_t)(mac >> 32), (uint32_t)mac);
+  snprintf(mqttTopic, sizeof(mqttTopic), "mosquito1/%04X%08X/sensores", (uint16_t)(mac >> 32), (uint32_t)mac);
   Serial.printf("Client ID: %s\n", mqttClientId);
   Serial.printf("Topic:     %s\n", mqttTopic);
   Serial.printf("Broker:    %s\n", MQTT_URI);

@@ -237,9 +237,9 @@
       <span class="pill state-connecting" id="statusPill"><span class="dot"></span><span id="statusText">Conectando&hellip;</span></span>
       <span class="pill mono" id="pktCounter" style="background:var(--surface-2);color:var(--ink-2);">pkts enviados 0 / recibidos 0</span>
       <div class="status-meta">
-        <span>Broker <b class="mono">mqqt.diformosa.com</b></span>
+        <span>Broker <b class="mono">HiveMQ Cloud</b></span>
         <span class="sep">&middot;</span>
-        <span>Topic <b class="mono">dexlab3d/#</b></span>
+        <span>Topic <b class="mono">mosquito1/#</b></span>
         <span class="sep">&middot;</span>
         <span id="lastSeen">Sin mensajes todav&iacute;a</span>
         <span class="sep">&middot;</span>
@@ -308,7 +308,7 @@
   </section>
 
   <footer class="note">
-Temperatura y humedad son la lectura real de un sensor <b>DHT21</b> conectado al ESP32 (pin de datos en GPIO18, con pull-up). Este panel se conecta directo desde tu navegador a <code>wss://mqqt.diformosa.com/mqtt</code> &mdash; nadie m&aacute;s ve estos datos salvo que compartas el link de este panel.
+Temperatura y humedad son la lectura real de un sensor <b>DHT21</b> conectado al ESP32 (pin de datos en GPIO18, con pull-up). Este panel se conecta directo desde tu navegador por WebSocket seguro (TLS) a un broker HiveMQ Cloud propio &mdash; nadie m&aacute;s ve estos datos salvo que compartas el link de este panel.
   </footer>
 </div>
 
@@ -547,7 +547,7 @@ Temperatura y humedad son la lectura real de un sensor <b>DHT21</b> conectado al
     if (mqttClient) { try { mqttClient.end(true); } catch(e){} }
     setStatus('connecting', 'Conectando…');
     var clientId = 'dashboard-' + Math.random().toString(16).slice(2, 10);
-    mqttClient = mqtt.connect('wss://mqqt.diformosa.com/mqtt', {
+    mqttClient = mqtt.connect('wss://5dab8a9752864256b9b112a6465de82a.s1.eu.hivemq.cloud:8884/mqtt', {
       username: user,
       password: pass,
       clientId: clientId,
@@ -560,9 +560,9 @@ Temperatura y humedad son la lectura real de un sensor <b>DHT21</b> conectado al
       setStatus('connected', 'Conectado');
       try { hideAuthCard(); } catch(e){ addSystemLog('Error al ocultar formulario: ' + e.message); }
       try {
-        mqttClient.subscribe('dexlab3d/#', { qos: 0 }, function(err, granted){
+        mqttClient.subscribe('mosquito1/#', { qos: 0 }, function(err, granted){
           if (err) addSystemLog('Suscripcion RECHAZADA: ' + err.message);
-          else addSystemLog('Suscrito a dexlab3d/# — qos otorgado: ' + JSON.stringify(granted));
+          else addSystemLog('Suscrito a mosquito1/# — qos otorgado: ' + JSON.stringify(granted));
         });
       } catch(e){ addSystemLog('Excepcion al suscribir: ' + e.message); }
     });
