@@ -387,7 +387,7 @@
   </section>
 
   <footer class="note">
-Temperatura y humedad son la lectura real de dos sensores <b>DHT21</b> conectados al ESP32 (Sensor 1 y Sensor 2, ambos con pull-up). Este panel se conecta directo desde tu navegador por WebSocket seguro (TLS) a un broker HiveMQ Cloud propio &mdash; nadie m&aacute;s ve estos datos salvo que compartas el link de este panel.
+Temperatura y humedad son la lectura real de dos sensores <b>DHT21</b> conectados al ESP32 (Sensor 1 y Sensor 2, ambos con pull-up). Este panel se conecta directo desde tu navegador por WebSocket seguro (TLS) a <span id="brokerNombre"></span> &mdash; nadie m&aacute;s ve estos datos salvo que compartas el link de este panel.
   </footer>
 </div>
 
@@ -448,6 +448,12 @@ Temperatura y humedad son la lectura real de dos sensores <b>DHT21</b> conectado
   function fmtClock(d){
     function p2(n){ return (n<10?'0':'')+n; }
     return p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds());
+  }
+
+  function esc(str){
+    return String(str).replace(/[&<>"']/g, function(c){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
   }
 
   function shortDevice(id){
@@ -629,17 +635,17 @@ Temperatura y humedad son la lectura real de dos sensores <b>DHT21</b> conectado
       lastMsgTs = now;
       row.innerHTML =
         '<span class="log-time">'+fmtClock(new Date(now))+'</span>' +
-        '<span class="log-device">'+shortDevice(device)+'</span>' +
+        '<span class="log-device">'+esc(shortDevice(device))+'</span>' +
         '<span class="log-payload">S1: '+(hasTemp ? data.temp_c.toFixed(1)+'&deg;C' : '&mdash;')+' &middot; '+(hasHum ? data.hum.toFixed(1)+'%' : '&mdash;')+
         ' &nbsp;|&nbsp; S2: '+(hasTemp2 ? data.temp_c_2.toFixed(1)+'&deg;C' : '&mdash;')+' &middot; '+(hasHum2 ? data.hum_2.toFixed(1)+'%' : '&mdash;')+
-        ' &middot; up '+data.uptime_s+'s</span>';
+        (typeof data.uptime_s === 'number' ? ' &middot; up '+data.uptime_s+'s' : '')+'</span>';
       renderAll();
       tickAges();
     } else {
       row.innerHTML =
         '<span class="log-time">'+fmtClock(new Date(now))+'</span>' +
-        '<span class="log-device">'+shortDevice(device)+'</span>' +
-        '<span class="log-payload">'+(payload.length > 90 ? payload.slice(0,90)+'…' : payload)+'</span>';
+        '<span class="log-device">'+esc(shortDevice(device))+'</span>' +
+        '<span class="log-payload">'+esc(payload.length > 90 ? payload.slice(0,90)+'…' : payload)+'</span>';
     }
 
     var empty = els.logList.querySelector('.log-empty');
@@ -650,13 +656,21 @@ Temperatura y humedad son la lectura real de dos sensores <b>DHT21</b> conectado
   }
 
   // ---------- MQTT over WebSocket ----------
+  // Cambiar BROKER_ACTIVO para elegir broker (debe coincidir con main.cpp)
+  var BROKERS = {
+    diformosa: { url: 'wss://mqqt.diformosa.com/mqtt', topic: 'sergio-pruebas/#', nombre: 'mqqt.diformosa.com' },
+    hivemq:    { url: 'wss://5dab8a9752864256b9b112a6465de82a.s1.eu.hivemq.cloud:8884/mqtt', topic: 'mosquito1/#', nombre: 'un broker HiveMQ Cloud propio' }
+  };
+  var BROKER_ACTIVO = 'diformosa';
+  var broker = BROKERS[BROKER_ACTIVO];
+  document.getElementById('brokerNombre').textContent = broker.nombre;
   var mqttClient = null;
 
   function connect(user, pass){
     if (mqttClient) { try { mqttClient.end(true); } catch(e){} }
     setStatus('connecting', 'Conectando…');
     var clientId = 'dashboard-' + Math.random().toString(16).slice(2, 10);
-    mqttClient = mqtt.connect('wss://5dab8a9752864256b9b112a6465de82a.s1.eu.hivemq.cloud:8884/mqtt', {
+    mqttClient = mqtt.connect(broker.url, {
       username: user,
       password: pass,
       clientId: clientId,
@@ -669,17 +683,27 @@ Temperatura y humedad son la lectura real de dos sensores <b>DHT21</b> conectado
       setStatus('connected', 'Conectado');
       try { hideAuthCard(); } catch(e){ addSystemLog('Error al ocultar formulario: ' + e.message); }
       try {
-        mqttClient.subscribe('mosquito1/#', { qos: 0 }, function(err, granted){
+        mqttClient.subscribe(broker.topic, { qos: 0 }, function(err, granted){
           if (err) addSystemLog('Suscripcion RECHAZADA: ' + err.message);
-          else addSystemLog('Suscrito a mosquito1/# — qos otorgado: ' + JSON.stringify(granted));
+          else addSystemLog('Suscrito a ' + broker.topic + ' — qos otorgado: ' + JSON.stringify(granted));
         });
       } catch(e){ addSystemLog('Excepcion al suscribir: ' + e.message); }
     });
     mqttClient.on('reconnect', function(){ setStatus('connecting', 'Reconectando…'); });
     mqttClient.on('close', function(){ setStatus('connecting', 'Desconectado, reintentando…'); });
     mqttClient.on('error', function(err){
+      var msg = err && err.message ? err.message : String(err);
+      addSystemLog('Error MQTT: ' + msg);
+      // CONNACK 4/5 = usuario/clave incorrectos o sin permiso: no tiene sentido reintentar
+      if (err && (err.code === 4 || err.code === 5 || /not authorized|bad user/i.test(msg))){
+        try { mqttClient.end(true); } catch(e){}
+        clearSavedAuth();
+        setStatus('error', 'Credenciales rechazadas');
+        authError.textContent = 'El broker rechazó el usuario o la clave.';
+        showAuthCard();
+        return;
+      }
       setStatus('error', 'Error de conexión');
-      addSystemLog('Error MQTT: ' + (err && err.message ? err.message : err));
     });
     mqttClient.on('packetsend', function(packet){
       pktSent++; updatePktCounter();
@@ -705,10 +729,11 @@ Temperatura y humedad son la lectura real de dos sensores <b>DHT21</b> conectado
   function addSystemLog(text){
     var row = document.createElement('li');
     row.className = 'log-row';
-    row.innerHTML = '<span class="log-time">'+fmtClock(new Date())+'</span><span class="log-device">sistema</span><span class="log-payload">'+text+'</span>';
+    row.innerHTML = '<span class="log-time">'+fmtClock(new Date())+'</span><span class="log-device">sistema</span><span class="log-payload">'+esc(text)+'</span>';
     var empty = els.logList.querySelector('.log-empty');
     if (empty) empty.remove();
     els.logList.appendChild(row);
+    while (els.logList.children.length > 40) els.logList.removeChild(els.logList.firstChild);
     els.logCount.textContent = els.logList.querySelectorAll('.log-row').length;
   }
 
@@ -727,16 +752,16 @@ Temperatura y humedad son la lectura real de dos sensores <b>DHT21</b> conectado
 
   function loadSavedAuth(){
     try {
-      var raw = localStorage.getItem('sensorBenchAuth');
+      var raw = localStorage.getItem('sensorBenchAuth_' + BROKER_ACTIVO);
       return raw ? JSON.parse(raw) : null;
     } catch(e){ return null; }
   }
   function saveAuth(user, pass){
-    try { localStorage.setItem('sensorBenchAuth', JSON.stringify({ user: user, pass: pass })); }
+    try { localStorage.setItem('sensorBenchAuth_' + BROKER_ACTIVO, JSON.stringify({ user: user, pass: pass })); }
     catch(e){}
   }
   function clearSavedAuth(){
-    try { localStorage.removeItem('sensorBenchAuth'); } catch(e){}
+    try { localStorage.removeItem('sensorBenchAuth_' + BROKER_ACTIVO); } catch(e){}
   }
 
   authForm.addEventListener('submit', function(e){

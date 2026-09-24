@@ -1,6 +1,6 @@
 /*
  * =====================================================================
- *  PRUEBA MQTT sobre WebSocket - ESP32 -> ws://mqqt.diformosa.com/mqtt
+ *  PRUEBA MQTT sobre WebSocket - ESP32 -> broker seleccionado en BROKER_ACTIVO
  * =====================================================================
  */
 #include <Arduino.h>
@@ -31,9 +31,22 @@ float ultimaHum2 = NAN;
 size_t wifiIdx = 0;
 
 // =====================================================================
-//  BROKER MQTT (WebSocket seguro - HiveMQ Cloud propio)
+//  BROKER MQTT - cambiar BROKER_ACTIVO para elegir cual usar
+//  - BROKER_DIFORMOSA -> ws://mqqt.diformosa.com/mqtt (sin TLS, topic dexlab3d/)
+//  - BROKER_HIVEMQ    -> HiveMQ Cloud propio, wss con TLS (topic mosquito1/)
+//  Si se cambia, cambiar tambien BROKER_ACTIVO en index.html.
 // =====================================================================
+#define BROKER_DIFORMOSA 1
+#define BROKER_HIVEMQ    2
+#define BROKER_ACTIVO    BROKER_DIFORMOSA
+
+#if BROKER_ACTIVO == BROKER_HIVEMQ
 const char* MQTT_URI = "wss://5dab8a9752864256b9b112a6465de82a.s1.eu.hivemq.cloud:8884/mqtt";
+#define MQTT_TOPIC_BASE "mosquito1"
+#else
+const char* MQTT_URI = "ws://mqqt.diformosa.com/mqtt";
+#define MQTT_TOPIC_BASE "sergio-pruebas"
+#endif
 
 esp_mqtt_client_handle_t mqttClient = nullptr;
 bool mqttIniciado = false;
@@ -100,7 +113,9 @@ void iniciarMqtt() {
   cfg.client_id = mqttClientId;
   if (MQTT_USER) cfg.username = MQTT_USER;
   if (MQTT_PASS) cfg.password = MQTT_PASS;
+#if BROKER_ACTIVO == BROKER_HIVEMQ
   cfg.cert_pem = ISRG_ROOT_X1;
+#endif
 
   mqttClient = esp_mqtt_client_init(&cfg);
   esp_mqtt_client_register_event(mqttClient, MQTT_EVENT_ANY, mqttEventHandler, NULL);
@@ -159,7 +174,7 @@ void setup() {
 
   uint64_t mac = ESP.getEfuseMac();
   snprintf(mqttClientId, sizeof(mqttClientId), "esp32-%04X%08X", (uint16_t)(mac >> 32), (uint32_t)mac);
-  snprintf(mqttTopic, sizeof(mqttTopic), "mosquito1/%04X%08X/sensores", (uint16_t)(mac >> 32), (uint32_t)mac);
+  snprintf(mqttTopic, sizeof(mqttTopic), MQTT_TOPIC_BASE "/%04X%08X/sensores", (uint16_t)(mac >> 32), (uint32_t)mac);
   Serial.printf("Client ID: %s\n", mqttClientId);
   Serial.printf("Topic:     %s\n", mqttTopic);
   Serial.printf("Broker:    %s\n", MQTT_URI);
