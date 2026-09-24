@@ -1,6 +1,6 @@
 /*
  * =====================================================================
- *  PRUEBA MQTT sobre WebSocket - ESP32 -> broker seleccionado en BROKER_ACTIVO
+ *  PRUEBA MQTT sobre WebSocket - ESP32 -> publica en diformosa y HiveMQ a la vez
  * =====================================================================
  */
 #include <Arduino.h>
@@ -31,32 +31,36 @@ float ultimaHum2 = NAN;
 size_t wifiIdx = 0;
 
 // =====================================================================
-//  BROKER MQTT - cambiar BROKER_ACTIVO para elegir cual usar
-//  - BROKER_DIFORMOSA -> ws://mqqt.diformosa.com/mqtt (sin TLS, topic dexlab3d/)
-//  - BROKER_HIVEMQ    -> HiveMQ Cloud propio, wss con TLS (topic mosquito1/)
-//  Si se cambia, cambiar tambien BROKER_ACTIVO en index.html.
+//  BROKERS MQTT - la placa publica en los dos a la vez y el dashboard
+//  elige de cual leer. Credenciales en include/secrets.h.
+//  - diformosa: ws://mqqt.diformosa.com/mqtt (sin TLS, topic sergio-pruebas/)
+//    OJO: el dominio real es "mqqt" (asi esta registrado); "mqtt.diformosa.com" no existe en DNS
+//  - hivemq: HiveMQ Cloud propio, wss con TLS (topic mosquito1/)
+//  Un broker con usuario vacio en secrets.h se saltea.
 // =====================================================================
-#define BROKER_DIFORMOSA 1
-#define BROKER_HIVEMQ    2
-#define BROKER_ACTIVO    BROKER_DIFORMOSA
+struct Broker {
+  const char* nombre;
+  const char* uri;
+  const char* topicBase;
+  const char* user;
+  const char* pass;
+  const char* certPem;
+  esp_mqtt_client_handle_t client;
+  volatile bool conectado;
+  char topic[48];
+};
 
-#if BROKER_ACTIVO == BROKER_HIVEMQ
-const char* MQTT_URI = "wss://5dab8a9752864256b9b112a6465de82a.s1.eu.hivemq.cloud:8884/mqtt";
-#define MQTT_TOPIC_BASE "mosquito1"
-#else
-const char* MQTT_URI = "ws://mqqt.diformosa.com/mqtt";
-#define MQTT_TOPIC_BASE "sergio-pruebas"
-#endif
-
-esp_mqtt_client_handle_t mqttClient = nullptr;
+Broker brokers[] = {
+  {"diformosa", "ws://mqqt.diformosa.com/mqtt", "sergio-pruebas", MQTT_USER, MQTT_PASS, nullptr, nullptr, false, ""},
+  {"hivemq", "wss://5dab8a9752864256b9b112a6465de82a.s1.eu.hivemq.cloud:8884/mqtt", "mosquito1", HIVEMQ_USER, HIVEMQ_PASS, ISRG_ROOT_X1, nullptr, false, ""},
+};
+const size_t BROKER_COUNT = sizeof(brokers) / sizeof(brokers[0]);
 bool mqttIniciado = false;
-volatile bool mqttConectado = false;
 
 char mqttClientId[32];
-char mqttTopic[48];
 
 unsigned long tUltPublish = 0;
-const unsigned long PUBLISH_CADA_MS = 5000;
+const unsigned long PUBLISH_CADA_MS = 2500;
 
 // =====================================================================
 //  WIFI - conecta probando la lista de redes por turnos
@@ -83,24 +87,25 @@ void conectarWifi() {
 }
 
 // =====================================================================
-//  MQTT - eventos del cliente ESP-IDF
+//  MQTT - eventos del cliente ESP-IDF (handlerArgs = el Broker)
 // =====================================================================
 static void mqttEventHandler(void* handlerArgs, esp_event_base_t base, int32_t eventId, void* eventData) {
+  Broker* b = (Broker*)handlerArgs;
   esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)eventData;
   switch ((esp_mqtt_event_id_t)eventId) {
     case MQTT_EVENT_CONNECTED:
-      mqttConectado = true;
-      Serial.println("MQTT conectado (WebSocket).");
+      b->conectado = true;
+      Serial.printf("[%s] MQTT conectado (WebSocket).\n", b->nombre);
       break;
     case MQTT_EVENT_DISCONNECTED:
-      mqttConectado = false;
-      Serial.println("MQTT desconectado.");
+      b->conectado = false;
+      Serial.printf("[%s] MQTT desconectado.\n", b->nombre);
       break;
     case MQTT_EVENT_ERROR:
-      Serial.println("MQTT error de conexion/transporte.");
+      Serial.printf("[%s] MQTT error de conexion/transporte.\n", b->nombre);
       break;
     case MQTT_EVENT_PUBLISHED:
-      Serial.printf("MQTT: broker confirmo el publish (msg_id=%d)\n", event->msg_id);
+      Serial.printf("[%s] broker confirmo el publish (msg_id=%d)\n", b->nombre, event->msg_id);
       break;
     default:
       break;
@@ -108,18 +113,23 @@ static void mqttEventHandler(void* handlerArgs, esp_event_base_t base, int32_t e
 }
 
 void iniciarMqtt() {
-  esp_mqtt_client_config_t cfg = {};
-  cfg.uri = MQTT_URI;
-  cfg.client_id = mqttClientId;
-  if (MQTT_USER) cfg.username = MQTT_USER;
-  if (MQTT_PASS) cfg.password = MQTT_PASS;
-#if BROKER_ACTIVO == BROKER_HIVEMQ
-  cfg.cert_pem = ISRG_ROOT_X1;
-#endif
+  for (size_t i = 0; i < BROKER_COUNT; i++) {
+    Broker& b = brokers[i];
+    if (!b.user || !b.user[0]) {
+      Serial.printf("[%s] sin credenciales en secrets.h, se saltea.\n", b.nombre);
+      continue;
+    }
+    esp_mqtt_client_config_t cfg = {};
+    cfg.uri = b.uri;
+    cfg.client_id = mqttClientId;
+    cfg.username = b.user;
+    cfg.password = b.pass;
+    cfg.cert_pem = b.certPem;
 
-  mqttClient = esp_mqtt_client_init(&cfg);
-  esp_mqtt_client_register_event(mqttClient, MQTT_EVENT_ANY, mqttEventHandler, NULL);
-  esp_mqtt_client_start(mqttClient);
+    b.client = esp_mqtt_client_init(&cfg);
+    esp_mqtt_client_register_event(b.client, MQTT_EVENT_ANY, mqttEventHandler, &b);
+    esp_mqtt_client_start(b.client);
+  }
   mqttIniciado = true;
 }
 
@@ -153,8 +163,12 @@ void leerYPublicar() {
                       "{\"temp_c\":%s,\"hum\":%s,\"temp_c_2\":%s,\"hum_2\":%s,\"uptime_s\":%lu}",
                       tempStr, humStr, temp2Str, hum2Str, millis() / 1000);
 
-  int msgId = esp_mqtt_client_publish(mqttClient, mqttTopic, payload, len, 1, 0);
-  Serial.printf("Publicado en %s -> %s (msg_id=%d, esperando confirmacion del broker...)\n", mqttTopic, payload, msgId);
+  for (size_t i = 0; i < BROKER_COUNT; i++) {
+    Broker& b = brokers[i];
+    if (!b.conectado) continue;
+    int msgId = esp_mqtt_client_publish(b.client, b.topic, payload, len, 1, 0);
+    Serial.printf("[%s] Publicado en %s -> %s (msg_id=%d)\n", b.nombre, b.topic, payload, msgId);
+  }
 }
 
 // =====================================================================
@@ -174,10 +188,12 @@ void setup() {
 
   uint64_t mac = ESP.getEfuseMac();
   snprintf(mqttClientId, sizeof(mqttClientId), "esp32-%04X%08X", (uint16_t)(mac >> 32), (uint32_t)mac);
-  snprintf(mqttTopic, sizeof(mqttTopic), MQTT_TOPIC_BASE "/%04X%08X/sensores", (uint16_t)(mac >> 32), (uint32_t)mac);
   Serial.printf("Client ID: %s\n", mqttClientId);
-  Serial.printf("Topic:     %s\n", mqttTopic);
-  Serial.printf("Broker:    %s\n", MQTT_URI);
+  for (size_t i = 0; i < BROKER_COUNT; i++) {
+    Broker& b = brokers[i];
+    snprintf(b.topic, sizeof(b.topic), "%s/%04X%08X/sensores", b.topicBase, (uint16_t)(mac >> 32), (uint32_t)mac);
+    Serial.printf("[%s] %s -> %s\n", b.nombre, b.uri, b.topic);
+  }
 
   randomSeed(esp_random());
 }
@@ -186,10 +202,13 @@ void loop() {
   conectarWifi();
 
   if (WiFi.status() == WL_CONNECTED && !mqttIniciado) {
-    iniciarMqtt();   // se inicia una sola vez; el cliente ESP-IDF reconecta solo
+    iniciarMqtt();   // se inicia una sola vez; cada cliente ESP-IDF reconecta solo
   }
 
-  if (mqttConectado && millis() - tUltPublish >= PUBLISH_CADA_MS) {
+  bool algunoConectado = false;
+  for (size_t i = 0; i < BROKER_COUNT; i++) algunoConectado |= brokers[i].conectado;
+
+  if (algunoConectado && millis() - tUltPublish >= PUBLISH_CADA_MS) {
     tUltPublish = millis();
     leerYPublicar();
   }
